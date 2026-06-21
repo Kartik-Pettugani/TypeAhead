@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: typeahead-postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: typeahead
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d typeahead"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis1:
+    image: redis:alpine
+    container_name: typeahead-redis-1
+    ports:
+      - "6381:6379"
+
+  redis2:
+    image: redis:alpine
+    container_name: typeahead-redis-2
+    ports:
+      - "6382:6379"
+
+  redis3:
+    image: redis:alpine
+    container_name: typeahead-redis-3
+    ports:
+      - "6383:6379"
+
+  backend:
+    build: ./backend
+    container_name: typeahead-backend
+    ports:
+      - "3005:3000"
+    volumes:
+      - ./frontend:/usr/src/app/public
+      - ./data:/usr/src/app/data
+    environment:
+      - PORT=3000
+      - DB_USER=admin
+      - DB_PASSWORD=password
+      - DB_HOST=postgres
+      - DB_NAME=typeahead
+      - DB_PORT=5432
+      - REDIS_NODES=redis://redis1:6379,redis://redis2:6379,redis://redis3:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis1:
+        condition: service_started
+      redis2:
+        condition: service_started
+      redis3:
+        condition: service_started
+
+volumes:
+  pgdata:
