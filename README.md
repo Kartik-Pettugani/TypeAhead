@@ -1,4 +1,4 @@
-# QuantumType - Distributed Search Typeahead System
+# Search Typeahead System
 
 A highly scalable search typeahead and suggestion system built to handle millions of queries with low read latency and minimal database write pressure. The system integrates consistent hash sharding across multiple caching nodes, write-around batch buffering, and temporal recency decay algorithms for trending queries.
 
