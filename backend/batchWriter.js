@@ -7,7 +7,7 @@ class BatchWriter {
     constructor(pgPool, flushIntervalMs = 5000) {
         this.pool = pgPool;
         this.buffer = new Map();
-        
+
         // Performance metrics for reporting and viva documentation
         this.stats = {
             totalIncomingSearches: 0,   // Total search events submitted by users
@@ -55,7 +55,7 @@ class BatchWriter {
         this.buffer.clear();
 
         const now = Date.now();
-        
+
         // Programmatically assemble bulk insert parameters
         let queryText = `
             INSERT INTO searches (query, all_time_count, recent_count, last_searched_at)
