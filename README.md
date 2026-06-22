@@ -2,22 +2,22 @@
 
 A highly scalable search typeahead and suggestion system built to handle millions of queries with low read latency and minimal database write pressure. The system integrates consistent hash sharding across multiple caching nodes, write-around batch buffering, and temporal recency decay algorithms for trending queries.
 
-## Project Screenshots
+## Project Workflow
 
 ### 1. Search Interface
 The main interface features a responsive input that debounces keystrokes to minimize backend load. It provides options to toggle between "Basic Ranking" (all-time popularity) and "Enhanced Ranking" (all-time + recency weight).
 
-![Search Interface](assets/screenshot1.png)
+<img src="./assets/screenshot1.png" alt="Search Interface" style="max-width: 100%;">
 
 ### 2. Autocomplete Suggestions
 As the user types, the system fetches cached suggestions (usually in under 3ms). It returns prefix-matched queries, which dynamically update via the distributed Redis cache ring.
 
-![Autocomplete Suggestions](assets/screenshot3.png)
+<img src="./assets/screenshot3.png" alt="Autocomplete Suggestions" style="max-width: 100%;">
 
 ### 3. Real-Time Telemetry & Metrics
 A live metrics dashboard shows system performance, including cache hit rates, p95 read latency, percentage of write reduction through batch processing, and which specific Redis shard served the request.
 
-![Real-time Metrics](assets/screenshot2.png)
+<img src="./assets/screenshot2.png" alt="Real-time Metrics" style="max-width: 100%;">
 
 ---
 
