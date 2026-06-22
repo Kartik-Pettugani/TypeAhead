@@ -491,12 +491,7 @@
             <div id="suggestions-dropdown" class="suggestions-dropdown"></div>
         </div>
 
-        <!-- Ranking mode toggle -->
-        <div class="mode-toggle">
-            <button id="btn-basic-ranking" class="mode-btn" onclick="setRankingMode('basic')">Basic Ranking</button>
-            <button id="btn-enhanced-ranking" class="mode-btn active" onclick="setRankingMode('enhanced')">Enhanced
-                Ranking</button>
-        </div>
+
 
         <!-- Trending -->
         <div class="trending-section">
@@ -588,7 +583,7 @@
             setTimeout(() => searchBar.classList.remove('submitted'), 1200);
 
             try {
-                const response = await fetch('/select?q=' + encodeURIComponent(val), {
+                const response = await fetch('/search?q=' + encodeURIComponent(val), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query: val })

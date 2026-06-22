@@ -1,5 +1,4 @@
 // Global Application State
-let currentRankingMode = 'enhanced'; // Default to recency decayed sorting
 let activeSuggestions = [];
 let highlightedIndex = -1;
 let debounceTimer = null;
@@ -59,7 +58,7 @@ function onInputChanged(event) {
  */
 async function fetchSuggestions(prefix) {
     try {
-        const url = `/suggestions?q=${encodeURIComponent(prefix)}&ranking=${currentRankingMode}`;
+        const url = `/suggest?q=${encodeURIComponent(prefix)}`;
         const start = performance.now();
         const response = await fetch(url);
         const list = await response.json();
@@ -191,7 +190,7 @@ async function submitSearch() {
     batchIndicator.style.color = "var(--primary)";
 
     try {
-        const response = await fetch('/select?q=' + encodeURIComponent(val), {
+        const response = await fetch('/search?q=' + encodeURIComponent(val), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query: val })
@@ -218,11 +217,11 @@ async function submitSearch() {
 }
 
 /**
- * Fetch and display global trending searches based on current ranking formula
+ * Fetch and display global trending searches
  */
 async function fetchTrending() {
     try {
-        const response = await fetch(`/suggestions?q=&ranking=${currentRankingMode}`);
+        const response = await fetch(`/suggest?q=`);
         const list = await response.json();
 
         trendingChipsContainer.innerHTML = '';
@@ -261,7 +260,7 @@ async function updateRoutingDetails(prefix) {
     }
 
     try {
-        const url = `/cache/debug?prefix=${encodeURIComponent(cleanPrefix)}&ranking=${currentRankingMode}`;
+        const url = `/cache/debug?prefix=${encodeURIComponent(cleanPrefix)}`;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -304,25 +303,6 @@ async function pollMetrics() {
     }
 }
 
-/**
- * Set the current ranking mode (Basic vs Enhanced)
- */
-function setRankingMode(mode) {
-    if (mode === currentRankingMode) return;
-
-    currentRankingMode = mode;
-
-    document.getElementById('btn-basic-ranking').classList.toggle('active', mode === 'basic');
-    document.getElementById('btn-enhanced-ranking').classList.toggle('active', mode === 'enhanced');
-
-    logEvent(`[Formula Change] Switched sorting logic to: ${mode === 'basic' ? 'Basic (All-Time Volume)' : 'Enhanced (Recency Decay)'}`);
-
-    // Clear search and refresh trending list
-    searchInput.value = '';
-    hideDropdown();
-    updateRoutingDetails('');
-    fetchTrending();
-}
 
 // Helper: Escape HTML strings for XSS mitigation
 function escapeHtml(str) {

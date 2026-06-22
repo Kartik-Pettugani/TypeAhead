@@ -5,7 +5,7 @@ A highly scalable search typeahead and suggestion system built to handle million
 ## Project Workflow
 
 ### 1. Search Interface
-The main interface features a responsive input that debounces keystrokes to minimize backend load. It provides options to toggle between "Basic Ranking" (all-time popularity) and "Enhanced Ranking" (all-time + recency weight).
+The main interface features a responsive input that debounces keystrokes to minimize backend load.
 
 <img src="./assets/screenshot1.png" alt="Search Interface" style="max-width: 100%;">
 
@@ -92,7 +92,7 @@ Below is the design detailing how data flows from user keystroke triggers down t
 ### A. Distributed Cache & Consistent Hashing
 - **The Ring Design**: In `backend/consistentHashRing.js`, the three Redis nodes (`redis1`, `redis2`, `redis3`) are registered as nodes. To ensure keyspace balancing and prevent clustering, we instantiate **100 virtual nodes** per physical node.
 - **Key Routing**: The ring hashes the user's typed search prefix (e.g. `iph`) using **MD5** to generate a hex keyspace string. The keyspace is traversed clockwise (lexicographically) to find the first virtual node that matches or exceeds the key's hash. The request is then routed to that node.
-- **Why Hashing the Prefix Matters**: Autocomplete relies on *prefix matches* (e.g., matching everything starting with `iph`). By hashing the prefix itself, all queries for the same prefix (and thus the same autocomplete result list) map to the exact same Redis cache node. This maximizes cache hit rates and eliminates cross-node synchronization.
+- **The Catch with Prefix Hashing (Cache Fragmentation)**: While hashing identical prefix strings guarantees they map to the exact same Redis cache node, it's important to note a crucial tradeoff. Progressively typed prefixes (e.g., `i`, `ip`, `iph`, `ipho`) each generate a completely different MD5 hash and land on different points of the consistent hash ring. This scatters a single user's autocomplete session across multiple Redis nodes, fragmenting the cache. This is a defensible design choice that perfectly balances keyspace distribution, but it does mean cache hit rates may dip as a user progressively types new characters.
 
 ### B. Batch Writes (Write-Around Strategy)
 - **Problem**: Writing to a relational database synchronously on every single user click causes lock contention, transaction exhaustion, and high CPU loads.
@@ -121,19 +121,16 @@ Below is the design detailing how data flows from user keystroke triggers down t
 ## 4. API Endpoints
 
 ### 1. Suggestions API
-- **Endpoint**: `GET /suggestions?q=<prefix>&ranking=<basic|enhanced>`
+- **Endpoint**: `GET /suggest?q=<prefix>`
 - **Returns**: Array of up to 10 strings matching the lowercase prefix.
-- **Modes**:
-  - `ranking=enhanced` (default): sorts by Zipf count + (recent_count * 5).
-  - `ranking=basic`: sorts strictly by all-time counts.
 
 ### 2. Search Submission API
-- **Endpoint**: `POST /select?q=<query>`
+- **Endpoint**: `POST /search?q=<query>`
 - **Payload**: `{ "query": "string" }` (optional if passed via query param)
 - **Returns**: `{ "message": "Searched" }` (queues search into batch writer).
 
 ### 3. Debug Cache API
-- **Endpoint**: `GET /cache/debug?prefix=<prefix>&ranking=<basic|enhanced>`
+- **Endpoint**: `GET /cache/debug?prefix=<prefix>`
 - **Returns**: JSON object indicating which Redis node (redis-1, redis-2, or redis-3) is mapped by consistent hashing, the MD5 keyspace hash, and the current hit/miss status of the key.
 
 ### 4. Metrics Telemetry API

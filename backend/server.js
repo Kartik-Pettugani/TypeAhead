@@ -93,38 +93,25 @@ async function initialize() {
 }
 
 /**
- * API: GET /suggest?q=<prefix>&ranking=<basic|enhanced>
+ * API: GET /suggest?q=<prefix>
  * Returns up to 10 matching suggestion strings.
  * Falls back to PostgreSQL on cache miss and writes results to the mapped Redis node.
  */
-app.get('/suggestions', async (req, res) => {
+app.get('/suggest', async (req, res) => {
     const startTime = Date.now();
     const rawPrefix = req.query.q || '';
     const prefix = rawPrefix.trim().toLowerCase();
-    
-    // Support toggleable ranking modes for grading demonstration
-    const ranking = req.query.ranking || 'enhanced';
 
     try {
         // If prefix is empty, bypass cache and retrieve global trending directly from Postgres
         // so that trending chips update immediately when the batch writer flushes search counts.
         if (prefix === '') {
-            let dbQuery = '';
-            if (ranking === 'basic') {
-                dbQuery = `
-                    SELECT query 
-                    FROM searches 
-                    ORDER BY all_time_count DESC 
-                    LIMIT 10
-                `;
-            } else {
-                dbQuery = `
-                    SELECT query 
-                    FROM searches 
-                    ORDER BY (all_time_count + (recent_count * 5)) DESC 
-                    LIMIT 10
-                `;
-            }
+            const dbQuery = `
+                SELECT query 
+                FROM searches 
+                ORDER BY (all_time_count + (recent_count * 5)) DESC 
+                LIMIT 10
+            `;
             const dbRes = await pool.query(dbQuery);
             const suggestions = dbRes.rows.map(row => row.query);
             const duration = Date.now() - startTime;
@@ -132,8 +119,7 @@ app.get('/suggestions', async (req, res) => {
             return res.json(suggestions);
         }
 
-        // Namespace keys by ranking mode to prevent collision
-        const cacheKey = `suggest:${ranking}:${prefix}`;
+        const cacheKey = `suggest:${prefix}`;
 
         // Locate appropriate Redis client from Hash Ring
         const targetClient = hashRing.getClient(prefix);
@@ -154,43 +140,23 @@ app.get('/suggestions', async (req, res) => {
         let params = [];
 
         if (prefix) {
-            if (ranking === 'basic') {
-                // Rank purely on all-time popular search volume
-                dbQuery = `
-                    SELECT query 
-                    FROM searches 
-                    WHERE query LIKE $1 
-                    ORDER BY all_time_count DESC 
-                    LIMIT 10
-                `;
-            } else {
-                // Enhanced Ranking: Combines long-term volume with decayed recent trends
-                dbQuery = `
-                    SELECT query 
-                    FROM searches 
-                    WHERE query LIKE $1 
-                    ORDER BY (all_time_count + (recent_count * 5)) DESC 
-                    LIMIT 10
-                `;
-            }
+            // Enhanced Ranking: Combines long-term volume with decayed recent trends
+            dbQuery = `
+                SELECT query 
+                FROM searches 
+                WHERE query LIKE $1 
+                ORDER BY (all_time_count + (recent_count * 5)) DESC 
+                LIMIT 10
+            `;
             params = [`${prefix}%`];
         } else {
             // If prefix is empty, return global trending/popular queries
-            if (ranking === 'basic') {
-                dbQuery = `
-                    SELECT query 
-                    FROM searches 
-                    ORDER BY all_time_count DESC 
-                    LIMIT 10
-                `;
-            } else {
-                dbQuery = `
-                    SELECT query 
-                    FROM searches 
-                    ORDER BY (all_time_count + (recent_count * 5)) DESC 
-                    LIMIT 10
-                `;
-            }
+            dbQuery = `
+                SELECT query 
+                FROM searches 
+                ORDER BY (all_time_count + (recent_count * 5)) DESC 
+                LIMIT 10
+            `;
         }
 
         const dbRes = await pool.query(dbQuery, params);
@@ -213,8 +179,8 @@ app.get('/suggestions', async (req, res) => {
         // Gracefully failover: query directly from PostgreSQL to ensure continuous uptime
         try {
             const dbQuery = prefix 
-                ? `SELECT query FROM searches WHERE query LIKE $1 ORDER BY all_time_count DESC LIMIT 10`
-                : `SELECT query FROM searches ORDER BY all_time_count DESC LIMIT 10`;
+                ? `SELECT query FROM searches WHERE query LIKE $1 ORDER BY (all_time_count + (recent_count * 5)) DESC LIMIT 10`
+                : `SELECT query FROM searches ORDER BY (all_time_count + (recent_count * 5)) DESC LIMIT 10`;
             const dbRes = await pool.query(dbQuery, prefix ? [`${prefix}%`] : []);
             return res.json(dbRes.rows.map(r => r.query));
         } catch (dbErr) {
@@ -227,7 +193,7 @@ app.get('/suggestions', async (req, res) => {
  * API: POST /search
  * Receives search submissions and pushes them to the in-memory batch buffer.
  */
-app.post('/select', (req, res) => {
+app.post('/search', (req, res) => {
     const query = req.query.q || req.body.query;
     if (!query || typeof query !== 'string' || !query.trim()) {
         return res.status(400).json({ error: 'Search query is required.' });
@@ -240,17 +206,16 @@ app.post('/select', (req, res) => {
 });
 
 /**
- * API: GET /cache/debug?prefix=<prefix>&ranking=<basic|enhanced>
+ * API: GET /cache/debug?prefix=<prefix>
  * Debug cache routing: identifies which Redis node is responsible for the prefix
  * and reports the current hash values and hit/miss status.
  */
 app.get('/cache/debug', async (req, res) => {
     const rawPrefix = req.query.prefix || '';
     const prefix = rawPrefix.trim().toLowerCase();
-    const ranking = req.query.ranking || 'enhanced';
 
     try {
-        const cacheKey = `suggest:${ranking}:${prefix}`;
+        const cacheKey = `suggest:${prefix}`;
         const { nodeName, client, hash } = hashRing.getNodeAndClient(prefix);
 
         const cachedVal = await client.get(cacheKey);
